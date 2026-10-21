@@ -1,27 +1,22 @@
-const BASE = (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_BASE) || "/api/v1";
+// Cloudflare Pages serves native ES modules, not a Vite bundle.
+// Keep the same-origin API path so a Pages Function can proxy it securely.
+const configuredBase = typeof window !== "undefined" && typeof window.BITTOPOS_API_BASE === "string"
+  ? window.BITTOPOS_API_BASE.trim() : "";
+const BASE = (configuredBase || "/api/v1").replace(/\/+$/, "");
 let activeProjectId = null;
 
 async function request(path, options = {}) {
-  const response = await fetch(BASE + path, {
-    credentials: "include",
-    ...options,
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-  });
+  const response = await fetch(BASE + path, { credentials: "include", ...options, headers: { "Content-Type": "application/json", ...(options.headers || {}) } });
   const isJson = (response.headers.get("content-type") || "").includes("application/json");
   const payload = response.status === 204 ? null : isJson ? await response.json() : await response.text();
   if (!response.ok) {
-    const error = new Error(payload?.error || `HTTP ${response.status}`);
-    error.status = response.status;
-    error.payload = payload;
-    throw error;
+    const error = new Error((payload && payload.error) || ("HTTP " + response.status));
+    error.status = response.status; error.payload = payload; throw error;
   }
   return payload;
 }
 
-const projectPath = () => {
-  if (!activeProjectId) throw new Error("No hay un proyecto activo.");
-  return "/projects/" + encodeURIComponent(activeProjectId);
-};
+const projectPath = () => { if (!activeProjectId) throw new Error("No hay un proyecto activo."); return "/projects/" + encodeURIComponent(activeProjectId); };
 
 export const api = {
   health: () => request("/health"),
@@ -33,14 +28,7 @@ export const api = {
   listProjects: async profileId => (await request("/profiles/" + encodeURIComponent(profileId) + "/projects")).items,
   createProject: (profileId, project) => request("/profiles/" + encodeURIComponent(profileId) + "/projects", { method: "POST", body: JSON.stringify(project) }),
   setProject: projectId => { activeProjectId = projectId; },
-  getState: async () => {
-    const base = projectPath();
-    const [resources, data] = await Promise.all([
-      request(base + "/resources"),
-      request(base + "/workspace"),
-    ]);
-    return { resources: resources.items, workspace: data.workspace, revision: data.revision };
-  },
+  getState: async () => { const base = projectPath(); const [resources, data] = await Promise.all([request(base + "/resources"), request(base + "/workspace")]); return { resources: resources.items, workspace: data.workspace, revision: data.revision }; },
   createResource: resource => request(projectPath() + "/resources", { method: "POST", body: JSON.stringify(resource) }),
   updateResource: (id, resource) => request(projectPath() + "/resources/" + encodeURIComponent(id), { method: "PUT", body: JSON.stringify(resource) }),
   importToml: content => request(projectPath() + "/resources/import-toml", { method: "POST", body: JSON.stringify({ content }) }),
