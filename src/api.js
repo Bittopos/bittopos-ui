@@ -1,4 +1,4 @@
-const BASE = "/api/v1";
+const BASE = (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_BASE) || "/api/v1";
 let activeProjectId = null;
 
 async function request(path, options = {}) {
