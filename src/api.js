@@ -1,8 +1,10 @@
-const BASE = (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_BASE) || "/api/v1";
+const API_ORIGIN = (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_ORIGIN) || "https://api.bittopos.com";
+const BASE = (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_BASE) || API_ORIGIN + "/api/v1";
 let activeProjectId = null;
 
 async function request(path, options = {}) {
-  const response = await fetch(BASE + path, {
+  const url = path === "/health" ? API_ORIGIN + path : BASE + path;
+  const response = await fetch(url, {
     credentials: "include",
     ...options,
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
